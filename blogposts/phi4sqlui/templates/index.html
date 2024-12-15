@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Custom Canvas Chart with Incremental Updates</title>
+    <style>
+        body {
+            font-family: sans-serif;
+        }
+        #myChart {
+            border: 1px solid #ccc;
+        }
+        #dataOutput, #sqlOutput {
+            width:100%;
+            margin-top:10px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>Dynamic Data Viewer (No External Charting Libraries)</h1>
+    <p>Enter your query (e.g. "Give me the last humidity values"):</p>
+    <input type="text" id="userQuery" style="width:300px"/>
+    <button id="initBtn">Initialize Query</button>
+
+    <h2>Generated SQL:</h2>
+    <textarea id="sqlOutput" rows="4" readonly></textarea>
+
+    <h2>Data Output (JSON):</h2>
+    <textarea id="dataOutput" rows="20" readonly></textarea>
+
+    <h2>Live Chart</h2>
+    <canvas id="myChart" width="800" height="400"></canvas>
+
+    <script>
+        let currentSQL = null;
+        let updateInterval = null;
+        let chartData = [];  // Will hold {timestamp: Date, value: number}
+
+        const canvas = document.getElementById('myChart');
+        const ctx = canvas.getContext('2d');
+
+        document.getElementById('initBtn').addEventListener('click', function() {
+            const userQuery = document.getElementById('userQuery').value;
+            fetch('/init_query', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'user_query=' + encodeURIComponent(userQuery)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.error) {
+                    document.getElementById('sqlOutput').value = "Error: " + data.error;
+                    return;
+                }
+                currentSQL = data.sql;
+                document.getElementById('sqlOutput').value = currentSQL;
+
+                // Clear existing data
+                chartData = [];
+
+                // Start polling /run_query every 5 seconds after successful init
+                if (updateInterval) {
+                    clearInterval(updateInterval);
+                }
+                updateChart(); // immediate update
+                updateInterval = setInterval(updateChart, 5000);
+            })
+            .catch(error => {
+                document.getElementById('sqlOutput').value = "Error: " + error;
+            });
+        });
+
+        function updateChart() {
+            fetch('/run_query', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(!Array.isArray(data)) {
+                    document.getElementById('dataOutput').value = "Error: " + JSON.stringify(data);
+                    clearCanvas();
+                    return;
+                }
+
+                if (data.length === 0) {
+                    document.getElementById('dataOutput').value = "No data or no query initialized.";
+                    clearCanvas();
+                    return;
+                }
+
+                // Assume data has 'timestamp' in ISO8601 and another column for the value
+                let columns = Object.keys(data[0]).filter(c => c !== 'timestamp');
+                if (columns.length === 0) {
+                    document.getElementById('dataOutput').value = "No value columns returned in data.";
+                    clearCanvas();
+                    return;
+                }
+
+                let valueColumn = columns[0];
+
+                // Convert to array of {timestamp: Date, value: number}
+                let newData = data.map(d => {
+                    return {
+                        timestamp: new Date(d.timestamp),
+                        value: d[valueColumn]
+                    };
+                });
+
+                // Merge newData into chartData, assuming newData might include old points
+                // We'll append only points that are newer than the last timestamp in chartData
+                if (chartData.length > 0) {
+                    let lastTimestamp = chartData[chartData.length - 1].timestamp.getTime();
+                    let additionalPoints = newData.filter(pt => pt.timestamp.getTime() > lastTimestamp);
+                    // Append only changed values (new points)
+                    chartData.push(...additionalPoints);
+                } else {
+                    // Initial load: just take it all
+                    chartData = newData.slice();
+                }
+
+                // Keep at least 50% old data:
+                // If we have more than, say, 50 points, we might want to trim but keep half
+                if (chartData.length > 50) {
+                    // Keep last 50% of old data plus new data
+                    let keepCount = Math.floor(chartData.length * 0.5);
+                    chartData = chartData.slice(-keepCount);
+                }
+
+                // Display raw data
+                document.getElementById('dataOutput').value = JSON.stringify(chartData.map(pt => {
+                    return {
+                        timestamp: pt.timestamp.toISOString(),
+                        value: pt.value
+                    };
+                }), null, 2);
+
+                drawChart(chartData);
+            })
+            .catch(error => {
+                document.getElementById('dataOutput').value = "Error: " + error;
+                clearCanvas();
+            });
+        }
+
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function drawChart(dataArr) {
+            clearCanvas();
+
+            if (dataArr.length === 0) return;
+
+            let timestamps = dataArr.map(d => d.timestamp.getTime());
+            let values = dataArr.map(d => d.value);
+
+            let minTime = Math.min(...timestamps);
+            let maxTime = Math.max(...timestamps);
+            let minVal = Math.min(...values);
+            let maxVal = Math.max(...values);
+
+            // Add more padding to look more dynamic
+            let timeRange = maxTime - minTime;
+            let valRange = maxVal - minVal;
+            let timePadding = timeRange * 0.1;
+            let valPadding = valRange * 0.2;
+
+            minTime -= timePadding;
+            maxTime += timePadding;
+            minVal -= valPadding;
+            maxVal += valPadding;
+
+            function xScale(t) {
+                return ((t - minTime) / (maxTime - minTime)) * canvas.width;
+            }
+
+            function yScale(v) {
+                return canvas.height - ((v - minVal) / (maxVal - minVal)) * canvas.height;
+            }
+
+            // Draw a background grid (optional)
+            ctx.strokeStyle = '#eee';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            // Simple vertical lines at min/max
+            ctx.moveTo(xScale(minTime), 0); ctx.lineTo(xScale(minTime), canvas.height);
+            ctx.moveTo(xScale(maxTime), 0); ctx.lineTo(xScale(maxTime), canvas.height);
+            // Simple horizontal lines at min/max
+            ctx.moveTo(0, yScale(minVal)); ctx.lineTo(canvas.width, yScale(minVal));
+            ctx.moveTo(0, yScale(maxVal)); ctx.lineTo(canvas.width, yScale(maxVal));
+            ctx.stroke();
+
+            // Draw the line
+            ctx.strokeStyle = 'rgba(75, 192, 192, 1)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(xScale(timestamps[0]), yScale(values[0]));
+            for (let i = 1; i < timestamps.length; i++) {
+                ctx.lineTo(xScale(timestamps[i]), yScale(values[i]));
+            }
+            ctx.stroke();
+
+            // Draw points
+            ctx.fillStyle = 'rgba(75, 192, 192, 1)';
+            for (let i = 0; i < timestamps.length; i++) {
+                let tx = xScale(timestamps[i]);
+                let ty = yScale(values[i]);
+                ctx.beginPath();
+                ctx.arc(tx, ty, 3, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+        }
+    </script>
+</body>
+</html>
+
+
+
