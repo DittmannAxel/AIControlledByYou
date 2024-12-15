@@ -44,9 +44,9 @@ If previously used, these would be Chart.js and adapter libraries hosted locally
 Overall, this repository serves as a standalone demonstration of how to keep your operations local—querying locally, visualizing locally, and relying on a local LLM model. It ensures data privacy and control, fitting nicely as a supplemental resource for the related blog post.
 
 1. env_example.txt
-   Descritpion:
-   Fill in your values and rename it to .env -> to store your secrets
+Description:
+Fill in your values and rename it to .env -> to store your secrets
 
 2. requirenments.txt
-    Descritpion:
-    use pip install -r requirements.txt
+Description:
+use pip install -r requirements.txt
