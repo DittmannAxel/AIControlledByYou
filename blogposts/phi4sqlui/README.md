@@ -1,9 +1,9 @@
-Repository Title: “Phi-4 SLM and Keep Your Data Local”
+# Phi-4 SLM and Keep Your Data Local
 
-Introduction:
+## Introduction:
 This repository complements a blog post discussing how to leverage a local environment and tools—such as a SLM endpoint for this case Phi-4, a database, and custom chart rendering—to keep sensitive data local and secure. The code demonstrates how to query a database with AI-generated SQL, visualize dynamic factory-floor sensor data, and incrementally update a live chart without expsoing your data to external sources - suitable for Defense, National Security. As I tested the new Phi-4 I used a cloud based hosting, because it was more suitable, but: an SLM can also be executed local. Again, by using a local environment, you maintain full control over your data and operations.
 
-Files Overview:
+## Files Overview:
 
 1.	data_generator.py
 Description:
