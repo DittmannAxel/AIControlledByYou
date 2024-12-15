@@ -43,10 +43,14 @@ If previously used, these would be Chart.js and adapter libraries hosted locally
 
 Overall, this repository serves as a standalone demonstration of how to keep your operations local—querying locally, visualizing locally, and relying on a local LLM model. It ensures data privacy and control, fitting nicely as a supplemental resource for the related blog post.
 
-1. env_example.txt
+8. env_example.txt
 Description:
 Fill in your values and rename it to .env -> to store your secrets
 
-2. requirenments.txt
+9. requirenments.txt
 Description:
 use pip install -r requirements.txt
+
+10. docker-compose.yaml
+    Description: 
+	The docker file to install the database

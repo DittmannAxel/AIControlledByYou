@@ -1,5 +1,7 @@
 import psycopg2
-
+import os
+from dotenv import load_dotenv
+load_dotenv()
 # For reference, here is the CREATE TABLE statement:
 CREATE_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS sensor_data (
@@ -12,11 +14,11 @@ CREATE TABLE IF NOT EXISTS sensor_data (
 );
 """
 
-DB_HOST = 'localhost'
-DB_PORT = 5432
-DB_NAME = 'factory_data'
-DB_USER = 'myuser'
-DB_PASSWORD = 'mypassword'
+DB_HOST = os.getenv('DB_HOST')
+DB_PORT = os.getenv('DB_PORT')
+DB_NAME = os.getenv('DB_NAME')
+DB_USER = os.getenv('DB_USER')
+DB_PASSWORD = os.getenv('DB_PASSWORD')
 
 def check_table_and_print_data():
     try:
